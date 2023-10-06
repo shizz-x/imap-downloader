@@ -1,14 +1,11 @@
 import imap_tools as imap
 import sqlite3 as sql
-
-# Создайте соединение с базой данных SQLite
+import os
+from dotenv import load_dotenv
 conn = sql.connect('message.db')
 cursor = conn.cursor()
 
-conn.commit()
-
-# Подключитесь к почтовому ящику
-
+load_dotenv()
 
 def getMaxOfUIDs(mailbox: imap.mailbox.MailBox, folder: str) -> str:
     mailbox.folder.set(folder)
@@ -25,7 +22,7 @@ def get_max_id_of_table(table_name: str) -> str | None:
     table_exists = cursor.fetchone()
 
     if table_exists:
-        # Получаем максимальный ID элементов
+       
         cursor.execute(f"SELECT MAX(id) FROM {table_name}")
         max_id = cursor.fetchone()[0]
         
@@ -71,78 +68,51 @@ def generate_message_data(msg: imap.message.MailMessage) -> dict:
 
 
 def start():
-    first = True
-    min_uid = 1
-    global_count = 0
-    current_folder = ''
-    error_raised = False
-    uidTuple = [0, 1]
+    
     program_ends = False
     while not program_ends:
         try:
-            with imap.MailBox('imap.yandex.ru').login('msklaser@yandex.ru', 'han7418999luda') as mailbox:
+            with imap.MailBox(os.environ['DOMAIN']).login(os.environ['LOGIN'], os.environ['PASSWORD']) as mailbox:
                 for folder in mailbox.folder.list():
                     max_id_of_exists_table = get_max_id_of_table(''.join(e for e in folder.name if e.isalnum()))
                     skip_current_folder = False
                     max_uid = getMaxOfUIDs(mailbox=mailbox, folder=folder.name)
-                    
+                    uid_tuple = [str(1), max_uid]
+
+
                     if max_id_of_exists_table is not None:
+                        uid_tuple = [max_id_of_exists_table, max_uid]
                         if float(max_id_of_exists_table) > int(max_uid) * 0.8:
                             skip_current_folder = True
                     
 
 
-                
-
                     if not skip_current_folder:
-
-
-                        #check for previus raised error
-                        #start program from previous state
-                        if not error_raised:
-                            
-                            uidTuple = [str(1) if max_id_of_exists_table is None else max_id_of_exists_table, max_uid]
-                        else:
-                            uidTuple = [str(min_uid), max_uid]
-                            error_raised = False
+                        global_count =  int(max_id_of_exists_table) if max_id_of_exists_table is not None else 0
+                        create_table_if_not_exist(folder=folder.name)
                         
 
-                        # check for firts run in current folder
-                        if first:
-                            current_folder = folder.name
-                    
-                            first = False
 
+                        mailbox.folder.set(folder=folder.name)
 
-                        
-                        if folder.name == current_folder:
-                            
-                            create_table_if_not_exist(folder=folder.name)
-                            
+                        for msg in mailbox.fetch(imap.U(uid_tuple[0], uid_tuple[1])):
+                            try:
+                                print('global_count:', global_count)
+                                print('currentMessageSubject:', msg.subject)
+                                print('currentFolder:', folder.name)
+                                print('maxUid')
 
-                            mailbox.folder.set(folder=folder.name)
-                            current_folder = folder.name
+                                message_data = generate_message_data(msg)
 
-
-                            for msg in mailbox.fetch(imap.U(uidTuple[0], uidTuple[1])):
-                                try:
-                                    print('global_count:', global_count)
-                                    print('currentMessageSubject:', msg.subject)
-
-                                    message_data = generate_message_data(msg)
-
-                                    insert_message_data_to_db(message_data=message_data, folder=folder.name)
+                                insert_message_data_to_db(message_data=message_data, folder=folder.name)
                                     
-                                    global_count += 1
-                                except Exception as e:
-                                    print(f"Ошибка обработки сообщения: {str(e)}")
-                            global_count = 0
-                            first = True    
-                        
+                                global_count += 1
+                            except Exception as e:
+                                print(f"Ошибка обработки сообщения: {str(e)}")
+                        global_count = 0
+                program_ends = True
         except Exception as e:
-            error_raised = True
-            min_uid = str(global_count)
-            print('ERROR:', uidTuple, e)
+            print('ERROR:', e)
             input()
             
 start()
