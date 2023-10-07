@@ -82,7 +82,10 @@ def start():
 
                     if max_id_of_exists_table is not None:
                         uid_tuple = [max_id_of_exists_table, max_uid]
-                        if float(max_id_of_exists_table) > int(max_uid) * 0.8:
+                        try:
+                            if float(max_id_of_exists_table) > int(max_uid) * 0.8 or max_uid < 1 :
+                                skip_current_folder = True
+                        except:
                             skip_current_folder = True
                     
 
