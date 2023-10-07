@@ -100,10 +100,9 @@ def start():
 
                         for msg in mailbox.fetch(imap.U(uid_tuple[0], uid_tuple[1])):
                             try:
-                                print('global_count:', global_count)
+                                print(f'range: {global_count} - {max_uid}')
                                 print('currentMessageSubject:', msg.subject)
                                 print('currentFolder:', folder.name)
-                                print('maxUid')
 
                                 message_data = generate_message_data(msg)
 
